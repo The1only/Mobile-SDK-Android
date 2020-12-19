@@ -12,21 +12,21 @@ Declare dependency via Maven:
 <dependency>
     <groupId>com.dji</groupId>
     <artifactId>dji-sdk</artifactId>
-    <version>4.11.1</version>
+    <version>4.13.1</version>
 </dependency>
 
 <dependency>
     <groupId>com.dji</groupId>
     <artifactId>dji-sdk-provided</artifactId>
-    <version>4.11.1</version>
+    <version>4.13.1</version>
 </dependency>
 ~~~
 
 or Gradle:
 
 ~~~groovy
-compile 'com.dji:dji-sdk:4.11.1'
-provided 'com.dji:dji-sdk-provided:4.11.1'
+compile 'com.dji:dji-sdk:4.13.1'
+provided 'com.dji:dji-sdk-provided:4.13.1'
 ~~~
 
 For further detail on how to integrate the DJI Android SDK into your Android Studio project, please check the [Integrate SDK into Application](http://developer.dji.com/mobile-sdk/documentation/application-development-workflow/workflow-integrate.html#import-maven-dependency) tutorial.
@@ -69,6 +69,29 @@ Please visit [DJI Mobile SDK Documentation](https://developer.dji.com/mobile-sdk
 
 DJI Mobile UX SDK is a suite of product agnostic UI objects that fast tracks the development of iOS applications using the DJI Mobile SDK. For more details, please check [here](https://github.com/dji-sdk/Mobile-UXSDK-Android).
 
+## Device Health Information Json File
+
+You can find the **hms.json** and **`hms_match_sdkerror.json`** files in this repo's root folder.
+
+It contains error code and detailed description for device components. Only supported by some components of Matrice 300 RTK and Zenmuse H20 series.
+
+It is recommended to use device health information to replace old diagnostics for flight controller and RTK. There will be a few duplicated component error for gimbal, battery, perception module on Matrice 300 RTK.
+
+Please refer to the table below for duplicated error:
+
+| DJIDiagnosticsError | Enum Value | AlarmId |
+|:------------- |:---------------:| -------------:|
+| `BATTERY_DISCHARGE_OVER_CURRENT`  | 3001 | 0x110B0001|
+| `BATTERY_DISCHARGE_OVER_HEAT` | 3002  | 0x110B0002 |
+| `BATTERY_LOW_TEMPERATURE` | 3003  | 0x110B0003 |
+| `BATTERY_CELL_BROKEN` | 3004 | 0x110B0006 |
+| `GIMBAL_CONNECT_TO_FC_ERROR` | 2005 | 0x1D030001 |
+| `GIMBAL_GYROSCOPE_ERROR` | 2001 | 0x1D040002 |
+| `GIMBAL_PITCH_ERROR` | 2002 | 0x1D040004 |
+| `GIMBAL_ROLL_ERROR` | 2003 | 0x1D040003 |
+| `GIMBAL_YAW_ERROR` | 2004 | 0x1D040005 |
+
+
 ## ProGuard
 
 If you're planning on optimizing your app with [ProGuard](https://developer.android.com/studio/build/shrink-code.html), you can add the following rules to your app's `proguard.cfg` file:
@@ -79,7 +102,7 @@ If you're planning on optimizing your app with [ProGuard](https://developer.andr
 "-libraryjars ./PATH_TO_THIS_FILE/dji_android_sdk.aar"
 ~~~
 
-- For **API Library** folder, please use the rules in [proguard-project.txt](./proguard-project.txt) file. 
+- For **API Library** folder, please use the rules in [proguard-project](<https://github.com/dji-sdk/Mobile-SDK-Android/blob/master/Sample Code/app/proguard-rules.pro>) file. 
 
 > **Note**: There are two types of DJI Android SDK: **AAR** and **API Library folder**, you can download them from DJI Developer Website: <http://developer.dji.com/mobile-sdk/downloads/>.
 
@@ -111,7 +134,9 @@ The DJI Android SDK is dynamically linked with unmodified libraries of <a href=h
 
 You can get support from DJI with the following methods:
 
-- Post questions in [**Stackoverflow**](http://stackoverflow.com) using [**dji-sdk**](http://stackoverflow.com/questions/tagged/dji-sdk) tag
+- Post questions in DJI Developer Forums:
+[**Chinese Forum**](https://bbs.dji.com/forum-79-1.html?from=developer)
+, [**English Forum**](https://forum.dji.com/forum-139-1.html?from=developer)
 - dev@dji.com
 
 

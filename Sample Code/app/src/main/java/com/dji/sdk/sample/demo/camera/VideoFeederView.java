@@ -2,6 +2,9 @@ package com.dji.sdk.sample.demo.camera;
 
 import android.app.Service;
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
@@ -10,26 +13,34 @@ import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
 
-import androidx.annotation.NonNull;
-
 import com.dji.sdk.sample.R;
+import com.dji.sdk.sample.internal.PickerValueChangeListener;
 import com.dji.sdk.sample.internal.controller.DJISampleApplication;
 import com.dji.sdk.sample.internal.controller.MainActivity;
+import com.dji.sdk.sample.internal.utils.Helper;
 import com.dji.sdk.sample.internal.utils.ToastUtils;
 import com.dji.sdk.sample.internal.utils.VideoFeedView;
+import com.dji.sdk.sample.internal.view.PopupNumberPicker;
+import com.dji.sdk.sample.internal.view.PopupNumberPickerDouble;
 import com.dji.sdk.sample.internal.view.PresentableView;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
+import androidx.annotation.NonNull;
 import dji.common.airlink.PhysicalSource;
+import dji.common.airlink.VideoFeedPriority;
 import dji.common.error.DJIError;
 import dji.common.product.Model;
+import dji.common.util.CommonCallbacks;
 import dji.keysdk.AirLinkKey;
 import dji.keysdk.KeyManager;
 import dji.keysdk.ProductKey;
 import dji.keysdk.callback.ActionCallback;
 import dji.keysdk.callback.SetCallback;
 import dji.sdk.airlink.AirLink;
+import dji.sdk.airlink.OcuSyncLink;
 import dji.sdk.base.BaseProduct;
 import dji.sdk.camera.Camera;
 import dji.sdk.camera.VideoFeeder;
@@ -43,6 +54,12 @@ import dji.sdk.sdkmanager.DJISDKManager;
 public class VideoFeederView extends LinearLayout
     implements View.OnClickListener, PresentableView, CompoundButton.OnCheckedChangeListener {
 
+    private PopupNumberPicker popupNumberPicker = null;
+    private PopupNumberPickerDouble popupNumberPickerDouble = null;
+    private static int[] INDEX_CHOSEN = { -1, -1, -1 };
+    private Handler handler = new Handler(Looper.getMainLooper());
+
+    private Context context;
     private Switch enableSingle;
     private Switch enableDual;
     private Button lbOnlyBtn;
@@ -54,6 +71,9 @@ public class VideoFeederView extends LinearLayout
     private Button leftAndRightBtn;
     private Button leftAndFpvBtn;
     private Button rightAndFpvBtn;
+    private Button setVideoSourceBtn;
+    private Button setPrimaryPriorityBtn;
+    private Button getPrimaryPriorityBtn;
     private TextView primaryVideoFeedTitle;
     private TextView fpvVideoFeedTitle;
     private VideoFeedView primaryVideoFeed;
@@ -76,6 +96,7 @@ public class VideoFeederView extends LinearLayout
 
     public VideoFeederView(Context context) {
         super(context);
+        this.context = context;
         init(context);
     }
 
@@ -90,7 +111,6 @@ public class VideoFeederView extends LinearLayout
         initUI();
         initCallbacks();
         setUpListeners();
-
     }
 
     private void initUI() {
@@ -119,6 +139,13 @@ public class VideoFeederView extends LinearLayout
         rightAndFpvBtn.setOnClickListener(this);
         leftAndRightBtn = (Button) findViewById(R.id.video_feeder_left_right);
         leftAndRightBtn.setOnClickListener(this);
+
+        setVideoSourceBtn = (Button) findViewById(R.id.video_feeder_set_video_source);
+        setVideoSourceBtn.setOnClickListener(this);
+        setPrimaryPriorityBtn = (Button) findViewById(R.id.video_feeder_set_primary_priority);
+        setPrimaryPriorityBtn.setOnClickListener(this);
+        getPrimaryPriorityBtn = (Button) findViewById(R.id.video_feeder_get_primary_priority);
+        getPrimaryPriorityBtn.setOnClickListener(this);
 
         cameraListTitle = (TextView) findViewById(R.id.camera_index_title);
         primaryVideoFeedTitle = (TextView) findViewById(R.id.primary_video_feed_title);
@@ -257,6 +284,10 @@ public class VideoFeederView extends LinearLayout
         leftAndFpvBtn.setEnabled(false);
         rightAndFpvBtn.setEnabled(false);
         leftAndRightBtn.setEnabled(false);
+
+        setVideoSourceBtn.setEnabled(false);
+        setPrimaryPriorityBtn.setEnabled(false);
+        getPrimaryPriorityBtn.setEnabled(false);
     }
 
     private void setUpListeners() {
@@ -285,6 +316,7 @@ public class VideoFeederView extends LinearLayout
 
         final BaseProduct product = DJISDKManager.getInstance().getProduct();
         updateM210SeriesButtons();
+        updateM300Buttons();
         if (product != null) {
             VideoFeeder.VideoDataListener primaryVideoDataListener =
                 primaryVideoFeed.registerLiveVideo(VideoFeeder.getInstance().getPrimaryVideoFeed(), true);
@@ -295,7 +327,7 @@ public class VideoFeederView extends LinearLayout
                 String newText =
                     "Primary Source: " + VideoFeeder.getInstance().getPrimaryVideoFeed().getVideoSource().name();
                 ToastUtils.setResultToText(primaryVideoFeedTitle, newText);
-                if (isMultiStreamPlatform()) {
+                if (Helper.isMultiStreamPlatform()) {
                     String newTextFpv = "Secondary Source: " + VideoFeeder.getInstance()
                                                                           .getSecondaryVideoFeed()
                                                                           .getVideoSource()
@@ -306,7 +338,7 @@ public class VideoFeederView extends LinearLayout
             } else {
                 VideoFeeder.getInstance().removePhysicalSourceListener(sourceListener);
                 VideoFeeder.getInstance().getPrimaryVideoFeed().removeVideoDataListener(primaryVideoDataListener);
-                if (isMultiStreamPlatform()) {
+                if (Helper.isMultiStreamPlatform()) {
                     VideoFeeder.getInstance()
                                .getSecondaryVideoFeed()
                                .removeVideoDataListener(secondaryVideoDataListener);
@@ -325,6 +357,20 @@ public class VideoFeederView extends LinearLayout
                     leftAndFpvBtn.setEnabled(true);
                     rightAndFpvBtn.setEnabled(true);
                     leftAndRightBtn.setEnabled(true);
+                }
+            });
+        }
+    }
+
+    private void updateM300Buttons() {
+        if (Helper.isM300Product()) {
+            VideoFeederView.this.post(new Runnable() {
+                @Override
+                public void run() {
+                    disableAllButtons();
+                    setVideoSourceBtn.setEnabled(true);
+                    setPrimaryPriorityBtn.setEnabled(true);
+                    getPrimaryPriorityBtn.setEnabled(true);
                 }
             });
         }
@@ -351,6 +397,12 @@ public class VideoFeederView extends LinearLayout
             onClickRightAndFpvBtn();
         } else if (view == leftAndRightBtn) {
             onClickLeftAndRightBtn();
+        } else if (view == setVideoSourceBtn) {
+            onClickSetVideoSourceBtn();
+        } else if (view == setPrimaryPriorityBtn) {
+            onClickSetPrimaryPriorityBtn();
+        } else if (view == getPrimaryPriorityBtn) {
+            onClickGetPrimaryPriorityBtn();
         }
     }
 
@@ -435,6 +487,94 @@ public class VideoFeederView extends LinearLayout
         }
     }
 
+    private void onClickSetVideoSourceBtn() {
+        if (Helper.isM300Product()) {
+           if (airLink != null) {
+               OcuSyncLink ocuSyncLink = airLink.getOcuSyncLink();
+               if (ocuSyncLink != null) {
+
+                   final PhysicalSource[] videoIndex = new PhysicalSource[]{
+                           PhysicalSource.LEFT_CAM,
+                           PhysicalSource.RIGHT_CAM,
+                           PhysicalSource.TOP_CAM,
+                           PhysicalSource.FPV_CAM
+                   };
+
+                   Runnable r = new Runnable() {
+                       @Override
+                       public void run() {
+                           ocuSyncLink.assignSourceToPrimaryChannel(videoIndex[INDEX_CHOSEN[0]], videoIndex[INDEX_CHOSEN[1]], new CommonCallbacks.CompletionCallback() {
+                               @Override
+                               public void onResult(DJIError error) {
+                                   ToastUtils.setResultToToast("Set Video Source : " + (error != null ? error.getDescription() : "Success"));
+                               }
+                           });
+                           resetIndex();
+                       }
+                   };
+
+                   ArrayList<String> videos = new ArrayList<>(
+                           Arrays.asList(
+                                   PhysicalSource.LEFT_CAM.name(),
+                                   PhysicalSource.RIGHT_CAM.name(),
+                                   PhysicalSource.TOP_CAM.name(),
+                                   PhysicalSource.FPV_CAM.name()
+                           ));
+
+                   initPopupNumberPicker(videos, videos, r);
+               }
+           }
+        }
+    }
+
+    private void onClickSetPrimaryPriorityBtn() {
+        if (Helper.isM300Product()) {
+            VideoFeeder.VideoFeed videoFeed = VideoFeeder.getInstance().getPrimaryVideoFeed();
+            VideoFeedPriority[] priorityIndex = new VideoFeedPriority[]{
+                    VideoFeedPriority.HIGH,
+                    VideoFeedPriority.MEDIUM,
+                    VideoFeedPriority.LOW
+            };
+
+            Runnable r = new Runnable() {
+                @Override
+                public void run() {
+                    videoFeed.setPriority(VideoFeedPriority.find(INDEX_CHOSEN[0]), new CommonCallbacks.CompletionCallback() {
+                        @Override
+                        public void onResult(DJIError error) {
+                            ToastUtils.setResultToToast("Set Primary priority : " + (error != null ? error.getDescription() : "Success"));
+                        }
+                    });
+                    resetIndex();
+                }
+            };
+            ArrayList<String> priorities = new ArrayList<>(
+                    Arrays.asList(
+                            VideoFeedPriority.HIGH.name(),
+                            VideoFeedPriority.MEDIUM.name(),
+                            VideoFeedPriority.LOW.name()
+                    ));
+            initPopupNumberPicker(priorities, r);
+        }
+    }
+
+    private void onClickGetPrimaryPriorityBtn() {
+        if (Helper.isM300Product()) {
+            VideoFeeder.VideoFeed videoFeed = VideoFeeder.getInstance().getPrimaryVideoFeed();
+            videoFeed.getPriority(new CommonCallbacks.CompletionCallbackWith<VideoFeedPriority>() {
+                @Override
+                public void onSuccess(VideoFeedPriority priority) {
+                    ToastUtils.setResultToToast("Get Primary priority : " + priority);
+                }
+
+                @Override
+                public void onFailure(DJIError error) {
+                    ToastUtils.setResultToToast("Get Primary priority failed: " + error.getDescription());
+                }
+            });
+        }
+    }
+
     private boolean isM210SeriesTwoCameraConnected() {
 
         Object model = null;
@@ -479,21 +619,6 @@ public class VideoFeederView extends LinearLayout
         return false;
     }
 
-    private boolean isMultiStreamPlatform() {
-        Model model = DJISDKManager.getInstance().getProduct().getModel();
-        return model != null && (model == Model.INSPIRE_2
-            || model == Model.MATRICE_200
-            || model == Model.MATRICE_210
-            || model == Model.MATRICE_210_RTK
-            || model == Model.MATRICE_200_V2
-            || model == Model.MATRICE_210_V2
-            || model == Model.MATRICE_210_RTK_V2
-            || model == Model.MATRICE_600
-            || model == Model.MATRICE_600_PRO
-            || model == Model.A3
-            || model == Model.N3);
-    }
-
     @Override
     public int getDescription() {
         return R.string.component_listview_video_feeder;
@@ -516,5 +641,43 @@ public class VideoFeederView extends LinearLayout
     @Override
     public String getHint() {
         return this.getClass().getSimpleName() + ".java";
+    }
+
+    public void resetIndex() {
+        INDEX_CHOSEN = new int[3];
+        INDEX_CHOSEN[0] = -1;
+        INDEX_CHOSEN[1] = -1;
+        INDEX_CHOSEN[2] = -1;
+    }
+
+    private void initPopupNumberPicker(ArrayList<String> list, final Runnable r) {
+        popupNumberPicker = new PopupNumberPicker(context, list, new PickerValueChangeListener() {
+
+            @Override
+            public void onValueChange(int pos1, int pos2) {
+                popupNumberPicker.dismiss();
+                popupNumberPicker = null;
+                INDEX_CHOSEN[0] = pos1;
+                handler.post(r);
+            }
+        }, 500, 200, 0);
+        popupNumberPicker.showAtLocation(this, Gravity.CENTER, 0, 0);
+    }
+
+    private void initPopupNumberPicker(ArrayList<String> list1, ArrayList<String> list2, final Runnable r) {
+        popupNumberPickerDouble =
+                new PopupNumberPickerDouble(context, list1, null, list2, null, new PickerValueChangeListener() {
+
+                    @Override
+                    public void onValueChange(int pos1, int pos2) {
+                        popupNumberPickerDouble.dismiss();
+                        popupNumberPickerDouble = null;
+                        INDEX_CHOSEN[0] = pos1;
+                        INDEX_CHOSEN[1] = pos2;
+                        handler.post(r);
+                    }
+                }, 500, 200, 0);
+
+        popupNumberPickerDouble.showAtLocation(this, Gravity.CENTER, 0, 0);
     }
 }
